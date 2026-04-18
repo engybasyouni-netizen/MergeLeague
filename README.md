@@ -66,19 +66,24 @@ Prereqs:
 ## Screenshots
 
 ### Dashboard
-![Dashboard](file:///C:/Users/engyb/.cursor/projects/c-Users-engyb-MergeLeague/assets/c__Users_engyb_AppData_Roaming_Cursor_User_workspaceStorage_1c3713882aab4276b400355c10bc00e6_images_image-1dc61c1c-efa1-40d3-bbf4-5330718afd78.png)
+<img width="1920" height="1028" alt="image" src="https://github.com/user-attachments/assets/f5fa145b-7146-4d7c-b418-927f1c210713" />
+
 
 ### Team View
-![Team View](file:///C:/Users/engyb/.cursor/projects/c-Users-engyb-MergeLeague/assets/c__Users_engyb_AppData_Roaming_Cursor_User_workspaceStorage_1c3713882aab4276b400355c10bc00e6_images_image-db61e70d-07d1-419f-be2d-e135dff8f4b2.png)
+<img width="1915" height="981" alt="image" src="https://github.com/user-attachments/assets/7cf5a9b4-4c65-4e93-ae81-28bc0c4c3e09" />
+
 
 ### Wallet View
-![Wallet View](file:///C:/Users/engyb/.cursor/projects/c-Users-engyb-MergeLeague/assets/c__Users_engyb_AppData_Roaming_Cursor_User_workspaceStorage_1c3713882aab4276b400355c10bc00e6_images_image-c52eb5fd-7007-4f1a-b519-16973834d1cb.png)
+<img width="1920" height="1027" alt="image" src="https://github.com/user-attachments/assets/c2bc89ed-a127-4f8b-8d2c-1658b7d9f821" />
 
-### Team Demo Data
-![Team Demo Data](file:///C:/Users/engyb/.cursor/projects/c-Users-engyb-MergeLeague/assets/c__Users_engyb_AppData_Roaming_Cursor_User_workspaceStorage_1c3713882aab4276b400355c10bc00e6_images_image-d7bc4ee1-1d4b-44f6-bdad-dda7b325a5bf.png)
 
-### Leaderboard Demo Data
-![Leaderboard Demo Data](file:///C:/Users/engyb/.cursor/projects/c-Users-engyb-MergeLeague/assets/c__Users_engyb_AppData_Roaming_Cursor_User_workspaceStorage_1c3713882aab4276b400355c10bc00e6_images_image-6f5257f9-a4b9-4316-bc51-56c69be3b858.png)
+### Team Data
+<img width="1916" height="1032" alt="image" src="https://github.com/user-attachments/assets/978ce0ec-19a0-4011-941e-743aeee4338c" />
+
+
+### Leaderboard Data
+<img width="1912" height="977" alt="image" src="https://github.com/user-attachments/assets/8ce81832-4fa4-486b-a9c4-96ade2064b07" />
+
 
 ## Phases (roadmap)
 
