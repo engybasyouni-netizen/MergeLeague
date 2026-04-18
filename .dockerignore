@@ -1,0 +1,14 @@
+.git
+.github
+.next
+node_modules
+apps/web/.next
+apps/web/node_modules
+apps/api/node_modules
+packages/database/node_modules
+dist
+coverage
+*.log
+.env
+apps/api/.env
+apps/web/.env.local

@@ -1,0 +1,38 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 222 47% 5%;
+  --foreground: 210 40% 98%;
+  --border: 217 33% 17%;
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  @apply bg-[hsl(var(--background))] text-[hsl(var(--foreground))] antialiased;
+  font-family: var(--font-display), sans-serif;
+  background-image:
+    radial-gradient(circle at top, rgba(34, 211, 238, 0.12), transparent 32%),
+    linear-gradient(180deg, rgba(15, 23, 42, 0.95), rgba(2, 6, 23, 1));
+  background-attachment: fixed;
+}
+
+code,
+pre,
+.font-mono {
+  font-family: var(--font-mono), monospace;
+}
+
+::selection {
+  background: rgba(103, 232, 249, 0.35);
+  color: white;
+}
+
+* {
+  scrollbar-color: rgba(148, 163, 184, 0.3) transparent;
+}
+

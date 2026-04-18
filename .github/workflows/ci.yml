@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - develop
+
+jobs:
+  build-and-lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Generate Prisma client
+        run: npm run db:generate
+
+      - name: Build database package
+        run: npm run build --workspace=@mergeleague/database
+
+      - name: Build API
+        run: npm run build --workspace=@mergeleague/api
+
+      - name: Build web
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:4000
+        run: npm run build --workspace=@mergeleague/web

@@ -1,0 +1,24 @@
+{
+  "name": "mergeleague",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -k \"npm run dev --workspace=@mergeleague/api\" \"npm run dev --workspace=@mergeleague/web\"",
+    "dev:api": "npm run dev --workspace=@mergeleague/api",
+    "dev:web": "npm run dev --workspace=@mergeleague/web",
+    "build": "npm run build --workspaces --if-present",
+    "db:generate": "npm run generate --workspace=@mergeleague/database",
+    "db:migrate": "npm run migrate:dev --workspace=@mergeleague/database",
+    "db:studio": "npm run studio --workspace=@mergeleague/database",
+    "lint": "npm run lint --workspaces --if-present"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}

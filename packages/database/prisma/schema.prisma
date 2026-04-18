@@ -1,0 +1,316 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// --- Enums ------------------------------------------------------------------
+
+enum SeasonStatus {
+  UPCOMING
+  ACTIVE
+  ENDED
+  SETTLED
+}
+
+/// PR / issue / review — maps to GitHub GraphQL __typename-style work
+enum ContributionType {
+  PULL_REQUEST
+  ISSUE
+  REVIEW
+}
+
+enum ChainTxKind {
+  ENTRY_FEE
+  PAYOUT
+  REFUND
+  ADJUSTMENT
+}
+
+enum AntiCheatFlagStatus {
+  OPEN
+  DISMISSED
+  CONFIRMED
+}
+
+enum LeagueEntryStatus {
+  PENDING_PAYMENT
+  ACTIVE
+  VOID
+}
+
+// --- Core identity ----------------------------------------------------------
+
+model User {
+  id             String   @id @default(cuid())
+  githubId       String   @unique
+  githubLogin    String
+  email          String?
+  avatarUrl      String?
+  /// Global trust 0–1; lowered by confirmed abuse
+  trustScore     Decimal  @default(1) @db.Decimal(6, 5)
+  cheatStrikeCount Int    @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  teamMembers    TeamMember[]
+  wallets        Wallet[]
+  contributions  Contribution[]
+  scores         Score[]
+  leagueEntries     LeagueEntry[]
+  antiCheatFlags    AntiCheatFlag[]
+  chainTransactions ChainTransaction[]
+
+  @@index([githubLogin])
+}
+
+/// Engineering team (maps to GitHub org/team or app-defined group)
+model Team {
+  id           String   @id @default(cuid())
+  name         String
+  slug         String   @unique
+  /// GitHub org or team node id when linked
+  githubNodeId String?  @unique
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  members       TeamMember[]
+  leagueEntries LeagueEntry[]
+
+  @@index([name])
+}
+
+model TeamMember {
+  id        String   @id @default(cuid())
+  teamId    String
+  team      Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      String   @default("member")
+  createdAt DateTime @default(now())
+
+  @@unique([teamId, userId])
+  @@index([userId])
+}
+
+// --- Seasons & scoring config ----------------------------------------------
+
+model ScoringVersion {
+  id        String   @id @default(cuid())
+  version   String   @unique
+  rulesJson Json
+  createdAt DateTime @default(now())
+
+  seasons Season[]
+}
+
+model Season {
+  id               String       @id @default(cuid())
+  name             String
+  startsAt         DateTime
+  endsAt           DateTime
+  status           SeasonStatus @default(UPCOMING)
+  entryFeeXlm      Decimal      @db.Decimal(20, 7)
+  poolPublicKey    String?
+  scoringVersionId String
+  scoringVersion   ScoringVersion @relation(fields: [scoringVersionId], references: [id])
+  createdAt        DateTime @default(now())
+
+  contributions Contribution[]
+  scores        Score[]
+  leagueEntries LeagueEntry[]
+  transactions   ChainTransaction[]
+  antiCheatFlags AntiCheatFlag[]
+
+  @@index([status, startsAt])
+  @@index([endsAt])
+}
+
+// --- Repository (optional FK; contributions also denormalize repo text) ----
+
+model Repository {
+  id            String   @id @default(cuid())
+  githubNodeId  String   @unique
+  fullName      String
+  ownerLogin    String
+  name          String
+  isPrivate     Boolean  @default(true)
+  defaultBranch String   @default("main")
+  weight        Decimal  @default(1) @db.Decimal(10, 4)
+  createdAt     DateTime @default(now())
+
+  contributions Contribution[]
+
+  @@index([ownerLogin, name])
+}
+
+// --- Contributions (append-only facts + anti-cheat signals) ---------------
+
+model Contribution {
+  id        String           @id @default(cuid())
+  type      ContributionType
+  /// GitHub global node ID — unique for idempotent ingest
+  githubId  String           @unique
+  seasonId  String
+  season    Season           @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  authorUserId String
+  author       User           @relation(fields: [authorUserId], references: [id], onDelete: Cascade)
+
+  repositoryId String?
+  repository   Repository?  @relation(fields: [repositoryId], references: [id], onDelete: SetNull)
+  /// Denormalized "owner/name" for fast display and queries without join
+  repoFullName String
+
+  linesAdded          Int     @default(0)
+  linesDeleted        Int     @default(0)
+  /// Total lines touched (typically additions + deletions; stored explicitly for indexing)
+  linesChanged        Int     @default(0)
+  reviewCommentsCount Int     @default(0)
+
+  occurredAt DateTime
+  ingestedAt DateTime @default(now())
+
+  /// Points before caps / quality (auditable)
+  rawPoints     Decimal @db.Decimal(20, 7)
+  /// Multiplier from quality heuristics (0–1+)
+  qualityFactor Decimal @default(1) @db.Decimal(10, 6)
+  /// Final points credited toward Score aggregation
+  pointsAwarded Decimal @db.Decimal(20, 7)
+
+  /// 0–1 quality estimate for this unit of work
+  qualityScore   Decimal @default(0) @db.Decimal(6, 5)
+  /// 0–1 spam / abuse likelihood (higher = worse)
+  spamLikelihood Decimal @default(0) @db.Decimal(6, 5)
+  flagCount      Int     @default(0)
+  isSuspicious   Boolean @default(false)
+  suspicionNotes Json?
+
+  @@index([seasonId, authorUserId])
+  @@index([seasonId, occurredAt])
+  @@index([seasonId, type])
+  @@index([repoFullName])
+  @@index([authorUserId, occurredAt])
+  @@index([isSuspicious])
+}
+
+// --- Aggregated leaderboard rows ------------------------------------------
+
+/// Materialized leaderboard row per user per season (global). Team-only boards can be views or a follow-up `TeamScore` model with strict @@unique([teamId, seasonId]).
+model Score {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  seasonId  String
+  season    Season   @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+
+  totalPoints   Decimal @db.Decimal(20, 7)
+  qualityScore  Decimal @db.Decimal(20, 7)
+  rank          Int?
+
+  prCount       Int @default(0)
+  issueCount    Int @default(0)
+  reviewCount   Int @default(0)
+
+  /// Denormalized for fast API without join
+  githubLogin String
+
+  lastComputedAt DateTime @default(now())
+
+  @@unique([userId, seasonId])
+  @@index([seasonId, rank])
+  @@index([seasonId, totalPoints(sort: Desc)])
+}
+
+// --- Stellar / wallet layer -------------------------------------------------
+
+model Wallet {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  publicKey  String   @unique
+  encryptedSecret String?
+  network    String
+  label      String?
+  isPrimary  Boolean  @default(true)
+  fundedAt   DateTime?
+  createdAt  DateTime @default(now())
+
+  transactions ChainTransaction[]
+
+  @@index([userId, isPrimary])
+}
+
+/// On-chain movements (table name `transactions` — model name avoids clashing with Prisma `$transaction`)
+model ChainTransaction {
+  id          String      @id @default(cuid())
+  walletId    String?
+  wallet      Wallet?     @relation(fields: [walletId], references: [id], onDelete: SetNull)
+  userId      String?
+  user        User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  seasonId    String?
+  season      Season?     @relation(fields: [seasonId], references: [id], onDelete: SetNull)
+
+  kind        ChainTxKind
+  amountXlm   Decimal     @db.Decimal(20, 7)
+  txHash      String      @unique
+  ledger      Int?
+  memo        String?
+  confirmedAt DateTime?
+  createdAt   DateTime    @default(now())
+
+  leagueEntries LeagueEntry[]
+
+  @@index([seasonId, kind])
+  @@index([userId])
+  @@map("transactions")
+}
+
+// --- League participation -------------------------------------------------
+
+model LeagueEntry {
+  id        String           @id @default(cuid())
+  userId    String
+  user      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  seasonId  String
+  season    Season             @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  teamId    String?
+  team      Team?              @relation(fields: [teamId], references: [id], onDelete: SetNull)
+
+  status       LeagueEntryStatus @default(PENDING_PAYMENT)
+  paidAt       DateTime?
+  entryTxHash  String?          @unique
+  paymentMemo  String?          @unique
+  entryTxId    String?          @unique
+  entryTx      ChainTransaction? @relation(fields: [entryTxId], references: [id], onDelete: SetNull)
+
+  /// Risk at signup / payment time (0–1)
+  entryRiskScore Decimal @default(0) @db.Decimal(6, 5)
+  isSuspicious   Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, seasonId])
+  @@index([seasonId, status])
+  @@index([teamId, seasonId])
+}
+
+// --- Anti-cheat cases -------------------------------------------------------
+
+model AntiCheatFlag {
+  id        String               @id @default(cuid())
+  userId    String
+  user      User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  seasonId  String?
+  season    Season?              @relation(fields: [seasonId], references: [id], onDelete: SetNull)
+  reason    String
+  status    AntiCheatFlagStatus  @default(OPEN)
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@index([userId, status])
+  @@index([seasonId])
+}
